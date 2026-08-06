@@ -286,10 +286,9 @@ export default function App() {
       endAtRef.current = null;
       return;
     }
-    if (remainingSeconds === 0) {
-      setRemainingSeconds(configuredMinutes * 60);
-      setIsComplete(false);
-    }
+    if (remainingSeconds <= 0) return;
+    setIsComplete(false);
+    setIsCelebrating(false);
     setIsRunning(true);
   };
 
@@ -302,6 +301,7 @@ export default function App() {
   };
 
   const progressDegrees = (remainingSeconds / (MAX_MINUTES * 60)) * 360;
+  const isStartDisabled = !isRunning && remainingSeconds <= 0;
   const statusCopy = isComplete
     ? "좋아요! 집중 시간이 끝났어요."
     : isRunning
@@ -311,11 +311,13 @@ export default function App() {
         : "다이얼을 돌려 집중 시간을 정해보세요.";
   const primaryLabel = isRunning
     ? "일시정지"
-    : remainingSeconds < configuredMinutes * 60 && remainingSeconds > 0
-      ? "계속하기"
-      : isComplete
-        ? "다시 시작"
-        : "집중 시작";
+    : isStartDisabled
+      ? "시간 설정 필요"
+      : remainingSeconds < configuredMinutes * 60 && remainingSeconds > 0
+        ? "계속하기"
+        : isComplete
+          ? "다시 시작"
+          : "집중 시작";
 
   return (
     <main
@@ -594,6 +596,7 @@ export default function App() {
               className="simple-action simple-primary-action"
               type="button"
               onClick={toggleTimer}
+              disabled={isStartDisabled}
               aria-label={primaryLabel}
               title={primaryLabel}
             >
@@ -647,7 +650,12 @@ export default function App() {
           </div>
 
           <div className="action-row">
-            <button className="primary-action" type="button" onClick={toggleTimer}>
+            <button
+              className="primary-action"
+              type="button"
+              onClick={toggleTimer}
+              disabled={isStartDisabled}
+            >
               <span
                 className={isRunning ? "pause-icon" : "play-icon"}
                 aria-hidden="true"

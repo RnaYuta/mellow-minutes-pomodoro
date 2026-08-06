@@ -751,6 +751,13 @@ h1 {
   opacity: 1;
 }
 
+.simple-action:disabled,
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  transform: none;
+}
+
 .simple-primary-action {
   background: var(--simple-primary-bg);
   color: var(--simple-primary-fg);
