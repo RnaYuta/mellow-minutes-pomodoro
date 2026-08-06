@@ -1,6 +1,6 @@
 [package]
 name = "mellow-minutes"
-version = "1.0.0"
+version = "1.0.1"
 description = "A gentle menu bar Pomodoro timer for macOS"
 authors = ["Mellow Minutes"]
 edition = "2021"

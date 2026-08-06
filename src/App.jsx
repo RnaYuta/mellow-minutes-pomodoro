@@ -10,6 +10,39 @@ const SIMPLE_MODE_STORAGE_KEY = "mellow-minutes-simple-mode";
 const dialNumbers = Array.from({ length: 12 }, (_, index) =>
   index === 0 ? 60 : index * 5,
 );
+const seededRandom = (seed) => {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+};
+const confettiPieces = Array.from({ length: 120 }, (_, index) => ({
+  left: 3 + seededRandom(index + 1) * 94,
+  delay: -seededRandom(index + 71) * 6,
+  duration: 3.4 + seededRandom(index + 141) * 3.2,
+  drift: -62 + seededRandom(index + 211) * 124,
+  rotation: seededRandom(index + 281) * 180,
+  color: ((index * 11) ^ (index >> 1)) % 6,
+}));
+const confettiColors = [
+  "var(--accent)",
+  "var(--clock-color)",
+  "color-mix(in srgb, var(--accent), white 48%)",
+  "color-mix(in srgb, var(--clock-color), white 58%)",
+  "color-mix(in srgb, var(--accent), var(--clock-color) 45%)",
+  "color-mix(in srgb, var(--clock-color), black 22%)",
+];
+const fireworkBursts = [
+  { x: 28, y: 25, delay: 0.2, cycle: 4.3 },
+  { x: 74, y: 31, delay: 1.1, cycle: 5.7 },
+  { x: 51, y: 17, delay: 2.0, cycle: 6.2 },
+  { x: 22, y: 38, delay: 2.8, cycle: 4.9 },
+  { x: 79, y: 23, delay: 3.4, cycle: 6.8 },
+  { x: 46, y: 34, delay: 4.1, cycle: 5.3 },
+  { x: 67, y: 16, delay: 4.8, cycle: 7.1 },
+  { x: 17, y: 28, delay: 5.4, cycle: 5.9 },
+  { x: 82, y: 39, delay: 6.0, cycle: 6.5 },
+  { x: 52, y: 22, delay: 6.6, cycle: 4.7 },
+];
+const fireworkSparks = Array.from({ length: 12 }, (_, index) => index * 30);
 
 function getSavedColors() {
   try {
@@ -57,11 +90,18 @@ export default function App() {
   const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
   const [isSimpleMode, setIsSimpleMode] = useState(getSavedSimpleMode);
+  const [celebrationRun, setCelebrationRun] = useState(0);
+  const [isCelebrating, setIsCelebrating] = useState(false);
   const endAtRef = useRef(null);
   const draggingRef = useRef(false);
   const colorMenuRef = useRef(null);
   const gaugeColorInputRef = useRef(null);
   const clockColorInputRef = useRef(null);
+
+  const playCelebration = useCallback(() => {
+    setCelebrationRun((run) => run + 1);
+    setIsCelebrating(true);
+  }, []);
 
   const applyMinutes = useCallback((nextValue) => {
     const nextMinutes = clampMinutes(nextValue);
@@ -88,13 +128,14 @@ export default function App() {
         endAtRef.current = null;
         setIsRunning(false);
         setIsComplete(true);
+        playCelebration();
       }
     };
 
     updateTimer();
     const timerId = window.setInterval(updateTimer, 200);
     return () => window.clearInterval(timerId);
-  }, [isRunning]);
+  }, [isRunning, playCelebration]);
 
   useEffect(() => {
     localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(colors));
@@ -255,6 +296,7 @@ export default function App() {
   const resetTimer = () => {
     setIsRunning(false);
     setIsComplete(false);
+    setIsCelebrating(false);
     setRemainingSeconds(configuredMinutes * 60);
     endAtRef.current = null;
   };
@@ -283,6 +325,15 @@ export default function App() {
         "--user-clock-color": colors.clockColor,
       }}
     >
+      {import.meta.env.DEV && (
+        <button
+          className="celebration-test-button"
+          type="button"
+          onClick={playCelebration}
+        >
+          종료 효과 테스트
+        </button>
+      )}
       <section className="timer-workspace" aria-labelledby="page-title">
         <header className="brand-row" data-tauri-drag-region>
           <div className="brand-copy" data-tauri-drag-region>
@@ -424,9 +475,61 @@ export default function App() {
             </div>
         </div>
 
-        <div className={`timer-device ${isComplete ? "is-complete" : ""}`}>
+        <div
+          className={`timer-device ${isComplete ? "is-complete" : ""} ${isCelebrating ? "is-celebrating" : ""}`}
+        >
           <div className="simple-drag-region" data-tauri-drag-region />
           <div className="light-aura" aria-hidden="true" />
+          {(isComplete || isCelebrating) && (
+            <div
+              className="celebration-layer"
+              key={celebrationRun}
+              aria-hidden="true"
+            >
+              <div className="firework-rocket rocket-left" />
+              <div className="firework-rocket rocket-right" />
+              {fireworkBursts.map((burst, burstIndex) => (
+                <div
+                  className="firework-burst"
+                  key={`${burst.x}-${burst.y}`}
+                  style={{
+                    "--burst-x": `${burst.x}%`,
+                    "--burst-y": `${burst.y}%`,
+                    "--burst-delay": `${burst.delay}s`,
+                    "--burst-cycle": `${burst.cycle}s`,
+                  }}
+                >
+                  {fireworkSparks.map((angle, sparkIndex) => (
+                    <span
+                      key={angle}
+                      style={{
+                        "--spark-angle": `${angle}deg`,
+                        "--spark-color":
+                          (burstIndex + sparkIndex) % 2
+                            ? "var(--accent)"
+                            : "var(--clock-color)",
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
+              <div className="confetti-field">
+                {confettiPieces.map((piece, index) => (
+                  <span
+                    key={`${piece.left}-${index}`}
+                    style={{
+                      "--confetti-left": `${piece.left}%`,
+                      "--confetti-delay": `${piece.delay}s`,
+                      "--confetti-duration": `${piece.duration}s`,
+                      "--confetti-drift": `${piece.drift}px`,
+                      "--confetti-rotation": `${piece.rotation}deg`,
+                      "--confetti-color": confettiColors[piece.color],
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {["tl", "tr", "bl", "br"].map((position) => (
             <div
               className={`device-screw screw-${position}`}

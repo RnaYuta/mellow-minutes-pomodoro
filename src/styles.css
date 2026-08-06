@@ -88,7 +88,7 @@ input {
 
 .eyebrow {
   margin: 0 0 6px;
-  color: #4ca4cf;
+  color: color-mix(in srgb, var(--accent) 76%, CanvasText);
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.2em;
@@ -116,7 +116,7 @@ h1 {
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid #4087a933;
+  border: 1px solid color-mix(in srgb, var(--clock-color), transparent 68%);
   border-radius: 50%;
   background: #ffffff94;
 }
@@ -124,9 +124,9 @@ h1 {
 .status-lamp span {
   width: 12px;
   height: 12px;
-  border: 2px solid #abc7d4;
+  border: 2px solid color-mix(in srgb, var(--clock-color), Canvas 48%);
   border-radius: 50%;
-  background: #d5e5ec;
+  background: color-mix(in srgb, var(--clock-color), Canvas 72%);
 }
 
 .status-lamp.is-lit span {
@@ -150,7 +150,7 @@ h1 {
   height: 42px;
   place-content: center;
   gap: 4px;
-  border: 1px solid #4087a933;
+  border: 1px solid color-mix(in srgb, var(--clock-color), transparent 68%);
   border-radius: 13px;
   background: #ffffffb8;
   box-shadow: 0 6px 16px #36799a14;
@@ -161,7 +161,7 @@ h1 {
   width: 18px;
   height: 2px;
   border-radius: 99px;
-  background: #365f75;
+  background: color-mix(in srgb, var(--clock-color) 58%, CanvasText);
   transition: transform 0.18s ease, opacity 0.18s ease;
 }
 
@@ -176,7 +176,7 @@ h1 {
 
 .menu-toggle:focus-visible,
 .color-option:focus-visible {
-  outline: 3px solid #72b9da66;
+  outline: 3px solid color-mix(in srgb, var(--accent), transparent 58%);
   outline-offset: 2px;
 }
 
@@ -302,7 +302,7 @@ h1 {
 .desktop-option[aria-checked="true"] .toggle-track span { transform: translateX(14px); }
 
 .color-option:hover {
-  border-color: #5e9ab96b;
+  border-color: color-mix(in srgb, var(--accent), transparent 48%);
   transform: translateY(-1px);
 }
 
@@ -328,7 +328,7 @@ h1 {
 }
 
 .palette-icon {
-  color: #6a92a8;
+  color: color-mix(in srgb, var(--accent) 68%, CanvasText);
   font-size: 1.08rem;
 }
 
@@ -389,12 +389,134 @@ h1 {
   );
 }
 
-.timer-device.is-complete {
+.timer-device.is-complete,
+.timer-device.is-celebrating {
   animation: deviceGlow 1.15s ease-in-out infinite alternate;
 }
 
-.timer-device.is-complete .light-aura {
+.timer-device.is-complete .light-aura,
+.timer-device.is-celebrating .light-aura {
   animation: auraGlow 1.15s ease-in-out infinite alternate;
+}
+
+.celebration-test-button {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  z-index: 100;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, CanvasText, transparent 72%);
+  border-radius: 999px;
+  background: Canvas;
+  box-shadow: 0 4px 14px #0003;
+  color: CanvasText;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.celebration-test-button:active {
+  transform: translateX(-50%) scale(0.96);
+}
+
+.celebration-layer {
+  position: absolute;
+  inset: 8px;
+  z-index: 12;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.firework-burst {
+  position: absolute;
+  top: var(--burst-y);
+  left: var(--burst-x);
+  width: 4px;
+  height: 4px;
+}
+
+.firework-burst span {
+  position: absolute;
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  opacity: 0;
+  background: linear-gradient(var(--spark-color), transparent);
+  box-shadow: 0 0 7px var(--spark-color);
+  transform: rotate(var(--spark-angle)) translateY(0) scaleY(0.25);
+  transform-origin: 50% 100%;
+  animation: fireworkSpark var(--burst-cycle) cubic-bezier(0.18, 0.7, 0.24, 1) var(--burst-delay) infinite;
+}
+
+.firework-rocket {
+  position: absolute;
+  bottom: -12px;
+  z-index: 2;
+  width: 5px;
+  height: 13px;
+  border-radius: 999px 999px 45% 45%;
+  opacity: 0;
+  background: color-mix(in srgb, var(--clock-color), white 75%);
+  box-shadow: 0 0 9px 2px var(--clock-color);
+}
+
+.firework-rocket::before {
+  position: absolute;
+  top: 10px;
+  left: 1px;
+  width: 3px;
+  height: 58px;
+  border-radius: 999px;
+  background: linear-gradient(
+    color-mix(in srgb, var(--accent), white 35%),
+    color-mix(in srgb, var(--clock-color), transparent 42%),
+    transparent
+  );
+  filter: blur(0.5px);
+  content: "";
+}
+
+.firework-rocket::after {
+  position: absolute;
+  top: 9px;
+  left: -3px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px 4px var(--accent);
+  content: "";
+}
+
+.rocket-left {
+  left: 13%;
+  animation: rocketLaunchLeft 4.8s cubic-bezier(0.3, 0.65, 0.38, 1) 0.05s infinite;
+}
+
+.rocket-right {
+  right: 13%;
+  animation: rocketLaunchRight 5.6s cubic-bezier(0.3, 0.65, 0.38, 1) 1.35s infinite;
+}
+
+.confetti-field {
+  position: absolute;
+  inset: 0;
+}
+
+.confetti-field span {
+  position: absolute;
+  top: -12px;
+  left: var(--confetti-left);
+  width: 6px;
+  height: 10px;
+  border-radius: 2px;
+  opacity: 0;
+  background: var(--confetti-color);
+  transform: rotate(var(--confetti-rotation));
+  animation: confettiFall var(--confetti-duration) linear var(--confetti-delay) infinite;
 }
 
 .device-screw {
@@ -403,7 +525,7 @@ h1 {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #6aa8c5;
+  background: color-mix(in srgb, var(--clock-color) 72%, CanvasText);
   box-shadow: inset 1px 1px 2px #ffffffad;
 }
 
@@ -426,7 +548,11 @@ h1 {
 
 .clock-dial[aria-disabled="true"] { cursor: default; }
 .clock-dial.is-dragging { cursor: grabbing; }
-.clock-dial:focus-visible { box-shadow: 0 0 0 4px #f4fbff, 0 0 0 8px #19547261; }
+.clock-dial:focus-visible {
+  box-shadow:
+    0 0 0 4px Canvas,
+    0 0 0 8px color-mix(in srgb, var(--accent), transparent 52%);
+}
 
 .dial-face {
   position: absolute;
@@ -571,12 +697,12 @@ h1 {
   margin: clamp(14px, 2.8vh, 26px) auto 0;
   padding: clamp(7px, 1.2vh, 11px) clamp(13px, 2.5vw, 20px);
   border-radius: 12px;
-  background: #eaf6fabd;
-  color: #244a5d;
+  background: color-mix(in srgb, var(--clock-color), Canvas 80%);
+  color: color-mix(in srgb, var(--clock-color) 48%, CanvasText);
 }
 
 .readout-label {
-  color: #63859a;
+  color: color-mix(in srgb, var(--clock-color) 58%, CanvasText);
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -649,7 +775,7 @@ h1 {
 .time-input-group label {
   display: block;
   margin-bottom: 7px;
-  color: #405f72;
+  color: color-mix(in srgb, var(--accent) 64%, CanvasText);
   font-size: 0.74rem;
   font-weight: 750;
 }
@@ -752,9 +878,17 @@ h1 {
   text-align: center;
 }
 
-.status-message span { color: #8fbed3; font-size: 0.52rem; }
-.status-message.is-complete { color: #3384aa; }
-.status-message.is-complete span { color: #ffba5c; font-size: 0.92rem; }
+.status-message span {
+  color: color-mix(in srgb, var(--accent) 76%, CanvasText);
+  font-size: 0.52rem;
+}
+.status-message.is-complete {
+  color: color-mix(in srgb, var(--clock-color) 58%, CanvasText);
+}
+.status-message.is-complete span {
+  color: color-mix(in srgb, var(--accent) 82%, CanvasText);
+  font-size: 0.92rem;
+}
 
 .page-shell.is-simple {
   padding: 8px;
@@ -831,6 +965,34 @@ h1 {
 @keyframes auraGlow {
   from { opacity: 0.2; transform: scale(0.96); }
   to { opacity: 0.9; transform: scale(1.05); }
+}
+
+@keyframes fireworkSpark {
+  0% { opacity: 0; transform: rotate(var(--spark-angle)) translateY(0) scaleY(0.2); }
+  3% { opacity: 1; }
+  14% { opacity: 0.95; }
+  20%, 100% { opacity: 0; transform: rotate(var(--spark-angle)) translateY(-44px) scaleY(1); }
+}
+
+@keyframes rocketLaunchLeft {
+  0% { opacity: 0; transform: translate3d(0, 18px, 0) rotate(9deg); }
+  2%, 17% { opacity: 1; }
+  22%, 100% { opacity: 0; transform: translate3d(56px, -255px, 0) rotate(9deg); }
+}
+
+@keyframes rocketLaunchRight {
+  0% { opacity: 0; transform: translate3d(0, 18px, 0) rotate(-9deg); }
+  2%, 18% { opacity: 1; }
+  23%, 100% { opacity: 0; transform: translate3d(-58px, -235px, 0) rotate(-9deg); }
+}
+
+@keyframes confettiFall {
+  0% { opacity: 0; transform: translate3d(0, -8px, 0) rotate(var(--confetti-rotation)); }
+  10% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--confetti-drift), 360px, 0) rotate(calc(var(--confetti-rotation) + 620deg));
+  }
 }
 
 @keyframes lampPulse {
@@ -944,7 +1106,17 @@ h1 {
     color: ButtonText;
   }
 
-  .menu-toggle span { background: ButtonText; }
+  .status-lamp,
+  .menu-toggle {
+    border-color: color-mix(in srgb, var(--clock-color), transparent 52%);
+  }
+  .status-lamp span {
+    border-color: color-mix(in srgb, var(--clock-color), CanvasText 42%);
+    background: color-mix(in srgb, var(--clock-color), Canvas 52%);
+  }
+  .menu-toggle span {
+    background: color-mix(in srgb, var(--clock-color) 64%, CanvasText);
+  }
   .color-menu {
     border-color: color-mix(in srgb, CanvasText, transparent 84%);
     background: color-mix(in srgb, Canvas 90%, CanvasText 10%);
@@ -1011,8 +1183,11 @@ h1 {
     );
     box-shadow: 0 8px 14px #0008, inset 2px 2px 4px #ffffff1f;
   }
-  .digital-readout { background: color-mix(in srgb, Canvas 82%, CanvasText 18%); color: CanvasText; }
-  .readout-label,
+  .digital-readout {
+    background: color-mix(in srgb, var(--clock-color), Canvas 72%);
+    color: color-mix(in srgb, var(--clock-color) 34%, CanvasText);
+  }
+  .readout-label { color: color-mix(in srgb, var(--clock-color) 52%, CanvasText); }
   .number-field span { color: GrayText; }
   .number-field input { color: var(--ink); }
 
