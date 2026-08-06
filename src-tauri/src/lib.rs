@@ -1,8 +1,11 @@
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
+    Emitter, Manager, WindowEvent,
 };
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+const TOGGLE_TIMER_SHORTCUT: &str = "CommandOrControl+Shift+M";
 
 fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -24,8 +27,8 @@ fn is_always_on_top(window: tauri::WebviewWindow) -> Result<bool, String> {
 
 #[tauri::command]
 fn set_simple_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
-    let (width, height) = if enabled { (280.0, 336.0) } else { (340.0, 510.0) };
-    let (target_width, target_height) = if enabled { (320.0, 384.0) } else { (340.0, 510.0) };
+    let (width, height) = if enabled { (280.0, 336.0) } else { (320.0, 510.0) };
+    let (target_width, target_height) = if enabled { (320.0, 384.0) } else { (320.0, 510.0) };
 
     window
         .set_min_size(Some(tauri::LogicalSize::new(width, height)))
@@ -38,7 +41,7 @@ fn set_simple_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<(), St
             let ratio = if enabled {
                 objc2_foundation::NSSize::new(5.0, 6.0)
             } else {
-                objc2_foundation::NSSize::new(2.0, 3.0)
+                objc2_foundation::NSSize::new(32.0, 51.0)
             };
             native_window.setAspectRatio(ratio);
         })
@@ -49,14 +52,27 @@ fn set_simple_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<(), St
         .map_err(|error| error.to_string())
 }
 
+/// Mirrors the running countdown onto the menu bar tray icon so it's readable without
+/// opening the window.
+#[tauri::command]
+fn set_tray_title(app: tauri::AppHandle, title: String) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("mellow-minutes-tray") {
+        tray.set_title(Some(title)).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             set_always_on_top,
             is_always_on_top,
-            set_simple_mode
+            set_simple_mode,
+            set_tray_title
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -74,6 +90,14 @@ pub fn run() {
                 }
             }
 
+            // Global hotkey to start/pause the timer without switching to the app.
+            app.global_shortcut()
+                .on_shortcut(TOGGLE_TIMER_SHORTCUT, |app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        let _ = app.emit("toggle-timer", ());
+                    }
+                })?;
+
             let show_item = MenuItem::with_id(app, "show", "타이머 열기", true, None::<&str>)?;
             let pin_item = CheckMenuItem::with_id(
                 app,
@@ -87,10 +111,13 @@ pub fn run() {
             let quit_item = MenuItem::with_id(app, "quit", "Mellow Minutes 종료", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &pin_item, &separator, &quit_item])?;
             let pin_item_for_menu = pin_item.clone();
+            let tray_icon = tauri::image::Image::from_bytes(include_bytes!(
+                "../icons/tray-icon.png"
+            ))?;
 
             TrayIconBuilder::with_id("mellow-minutes-tray")
                 .tooltip("Mellow Minutes")
-                .icon(app.default_window_icon().expect("application icon").clone())
+                .icon(tray_icon)
                 .icon_as_template(true)
                 .menu(&menu)
                 .show_menu_on_left_click(true)
