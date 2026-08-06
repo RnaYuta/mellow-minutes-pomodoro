@@ -25,7 +25,7 @@ fn is_always_on_top(window: tauri::WebviewWindow) -> Result<bool, String> {
 #[tauri::command]
 fn set_simple_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
     let (width, height) = if enabled { (280.0, 336.0) } else { (340.0, 510.0) };
-    let (target_width, target_height) = if enabled { (320.0, 384.0) } else { (520.0, 780.0) };
+    let (target_width, target_height) = if enabled { (320.0, 384.0) } else { (340.0, 510.0) };
 
     window
         .set_min_size(Some(tauri::LogicalSize::new(width, height)))
