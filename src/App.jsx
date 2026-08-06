@@ -1,10 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 const MAX_MINUTES = 60;
 const DEFAULT_MINUTES = 25;
+const DEFAULT_GAUGE_COLOR = "#ff796f";
+const DEFAULT_CLOCK_COLOR = "#7cc2e0";
+const COLOR_STORAGE_KEY = "mellow-minutes-colors";
+const SIMPLE_MODE_STORAGE_KEY = "mellow-minutes-simple-mode";
 const dialNumbers = Array.from({ length: 12 }, (_, index) =>
   index === 0 ? 60 : index * 5,
 );
+
+function getSavedColors() {
+  try {
+    const savedColors = JSON.parse(localStorage.getItem(COLOR_STORAGE_KEY));
+    return {
+      gaugeColor: savedColors?.gaugeColor || DEFAULT_GAUGE_COLOR,
+      clockColor: savedColors?.clockColor || DEFAULT_CLOCK_COLOR,
+    };
+  } catch {
+    return {
+      gaugeColor: DEFAULT_GAUGE_COLOR,
+      clockColor: DEFAULT_CLOCK_COLOR,
+    };
+  }
+}
+
+function getSavedSimpleMode() {
+  const savedValue = localStorage.getItem(SIMPLE_MODE_STORAGE_KEY);
+  return savedValue === null ? true : savedValue === "true";
+}
 
 function clampMinutes(value) {
   return Math.min(MAX_MINUTES, Math.max(1, Math.round(value)));
@@ -19,6 +44,7 @@ function formatTime(totalSeconds) {
 }
 
 export default function App() {
+  const isTauriApp = "__TAURI_INTERNALS__" in window;
   const [configuredMinutes, setConfiguredMinutes] = useState(DEFAULT_MINUTES);
   const [inputValue, setInputValue] = useState(String(DEFAULT_MINUTES));
   const [remainingSeconds, setRemainingSeconds] = useState(
@@ -27,8 +53,15 @@ export default function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [colors, setColors] = useState(getSavedColors);
+  const [isColorMenuOpen, setIsColorMenuOpen] = useState(false);
+  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
+  const [isSimpleMode, setIsSimpleMode] = useState(getSavedSimpleMode);
   const endAtRef = useRef(null);
   const draggingRef = useRef(false);
+  const colorMenuRef = useRef(null);
+  const gaugeColorInputRef = useRef(null);
+  const clockColorInputRef = useRef(null);
 
   const applyMinutes = useCallback((nextValue) => {
     const nextMinutes = clampMinutes(nextValue);
@@ -62,6 +95,81 @@ export default function App() {
     const timerId = window.setInterval(updateTimer, 200);
     return () => window.clearInterval(timerId);
   }, [isRunning]);
+
+  useEffect(() => {
+    localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(colors));
+  }, [colors]);
+
+  useEffect(() => {
+    localStorage.setItem(SIMPLE_MODE_STORAGE_KEY, String(isSimpleMode));
+    if (!isTauriApp) return;
+
+    invoke("set_simple_mode", { enabled: isSimpleMode }).catch((error) => {
+      console.error("Simple 모드 창 크기를 적용하지 못했습니다.", error);
+    });
+  }, [isSimpleMode, isTauriApp]);
+
+  useEffect(() => {
+    if (!isTauriApp) return undefined;
+
+    const syncAlwaysOnTop = async () => {
+      try {
+        setIsAlwaysOnTop(await invoke("is_always_on_top"));
+      } catch (error) {
+        console.error("창 고정 상태를 확인하지 못했습니다.", error);
+      }
+    };
+
+    syncAlwaysOnTop();
+    window.addEventListener("focus", syncAlwaysOnTop);
+    return () => window.removeEventListener("focus", syncAlwaysOnTop);
+  }, [isTauriApp]);
+
+  useEffect(() => {
+    if (!isColorMenuOpen) return undefined;
+
+    const closeMenu = (event) => {
+      if (
+        event.type === "keydown" &&
+        event.key !== "Escape"
+      ) return;
+      if (
+        event.type === "pointerdown" &&
+        colorMenuRef.current?.contains(event.target)
+      ) return;
+      setIsColorMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeMenu);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeMenu);
+    };
+  }, [isColorMenuOpen]);
+
+  const updateColor = (colorName, value) => {
+    setColors((currentColors) => ({
+      ...currentColors,
+      [colorName]: value,
+    }));
+  };
+
+  const toggleAlwaysOnTop = async () => {
+    const nextValue = !isAlwaysOnTop;
+    setIsAlwaysOnTop(nextValue);
+    try {
+      await invoke("set_always_on_top", { enabled: nextValue });
+    } catch (error) {
+      setIsAlwaysOnTop(!nextValue);
+      console.error("항상 위 설정을 변경하지 못했습니다.", error);
+    }
+  };
+
+  const toggleSimpleMode = () => {
+    setIsColorMenuOpen(false);
+    setIsSimpleMode((enabled) => !enabled);
+  };
 
   const setTimeFromPoint = useCallback(
     (event) => {
@@ -168,22 +276,156 @@ export default function App() {
         : "집중 시작";
 
   return (
-    <main className="page-shell">
+    <main
+      className={`page-shell ${isSimpleMode ? "is-simple" : ""}`}
+      style={{
+        "--user-accent": colors.gaugeColor,
+        "--user-clock-color": colors.clockColor,
+      }}
+    >
       <section className="timer-workspace" aria-labelledby="page-title">
-        <header className="brand-row">
-          <div>
-            <p className="eyebrow">MELLOW MINUTES</p>
-            <h1 id="page-title">나만의 집중 타이머</h1>
-          </div>
-          <div
-            className={`status-lamp ${isComplete ? "is-lit" : ""}`}
-            aria-label={isComplete ? "타이머 완료 알림 켜짐" : "타이머 대기 중"}
-          >
-            <span />
+        <header className="brand-row" data-tauri-drag-region>
+          <div className="brand-copy" data-tauri-drag-region>
+            <p className="eyebrow" data-tauri-drag-region>MELLOW MINUTES</p>
+            <h1 id="page-title" data-tauri-drag-region>나만의 집중 타이머</h1>
           </div>
         </header>
 
+        <div className="header-actions">
+            <div
+              className={`status-lamp ${isComplete ? "is-lit" : ""}`}
+              aria-label={isComplete ? "타이머 완료 알림 켜짐" : "타이머 대기 중"}
+            >
+              <span />
+            </div>
+            <div className="color-menu-wrap" ref={colorMenuRef}>
+              <button
+                className="menu-toggle"
+                type="button"
+                aria-label="색상 설정 열기"
+                aria-expanded={isColorMenuOpen}
+                aria-controls="color-menu"
+                onClick={() => setIsColorMenuOpen((isOpen) => !isOpen)}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+
+              {isColorMenuOpen && (
+                <div className="color-menu" id="color-menu">
+                  <div className="color-menu-heading">
+                    <div>
+                      <strong>색상 설정</strong>
+                      <span>나만의 타이머를 만들어보세요</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setColors({
+                          gaugeColor: DEFAULT_GAUGE_COLOR,
+                          clockColor: DEFAULT_CLOCK_COLOR,
+                        })
+                      }
+                    >
+                      초기화
+                    </button>
+                  </div>
+
+                  <button
+                    className="desktop-option simple-mode-option"
+                    type="button"
+                    role="switch"
+                    aria-checked={isSimpleMode}
+                    onClick={toggleSimpleMode}
+                  >
+                    <span className="pin-symbol" aria-hidden="true">◫</span>
+                    <span>
+                      <strong>Simple 모드</strong>
+                      <small>작고 간결한 타이머로 표시해요</small>
+                    </span>
+                    <span className="toggle-track" aria-hidden="true">
+                      <span />
+                    </span>
+                  </button>
+
+                  {isTauriApp && (
+                    <button
+                      className="desktop-option"
+                      type="button"
+                      role="switch"
+                      aria-checked={isAlwaysOnTop}
+                      onClick={toggleAlwaysOnTop}
+                    >
+                      <span className="pin-symbol" aria-hidden="true">⌖</span>
+                      <span>
+                        <strong>항상 위에 표시</strong>
+                        <small>다른 창보다 앞에 타이머를 고정해요</small>
+                      </span>
+                      <span className="toggle-track" aria-hidden="true">
+                        <span />
+                      </span>
+                    </button>
+                  )}
+
+                  <button
+                    className="color-option"
+                    type="button"
+                    onClick={() => gaugeColorInputRef.current?.click()}
+                  >
+                    <span
+                      className="color-swatch"
+                      style={{ backgroundColor: colors.gaugeColor }}
+                    />
+                    <span className="color-option-copy">
+                      <strong>게이지 색상</strong>
+                      <small>{colors.gaugeColor.toUpperCase()}</small>
+                    </span>
+                    <span className="palette-icon" aria-hidden="true">◉</span>
+                  </button>
+                  <input
+                    ref={gaugeColorInputRef}
+                    className="native-color-input"
+                    type="color"
+                    value={colors.gaugeColor}
+                    aria-label="게이지 색상 팔레트"
+                    onChange={(event) =>
+                      updateColor("gaugeColor", event.target.value)
+                    }
+                  />
+
+                  <button
+                    className="color-option"
+                    type="button"
+                    onClick={() => clockColorInputRef.current?.click()}
+                  >
+                    <span
+                      className="color-swatch"
+                      style={{ backgroundColor: colors.clockColor }}
+                    />
+                    <span className="color-option-copy">
+                      <strong>시계 색상</strong>
+                      <small>{colors.clockColor.toUpperCase()}</small>
+                    </span>
+                    <span className="palette-icon" aria-hidden="true">◉</span>
+                  </button>
+                  <input
+                    ref={clockColorInputRef}
+                    className="native-color-input"
+                    type="color"
+                    value={colors.clockColor}
+                    aria-label="시계 색상 팔레트"
+                    onChange={(event) =>
+                      updateColor("clockColor", event.target.value)
+                    }
+                  />
+                </div>
+              )}
+            </div>
+        </div>
+
         <div className={`timer-device ${isComplete ? "is-complete" : ""}`}>
+          <div className="simple-drag-region" data-tauri-drag-region />
           <div className="light-aura" aria-hidden="true" />
           {["tl", "tr", "bl", "br"].map((position) => (
             <div
@@ -244,7 +486,34 @@ export default function App() {
             </div>
           </div>
 
-          <div className="digital-readout" aria-live="polite">
+          <div className="simple-control-row">
+            <button
+              className="simple-action simple-primary-action"
+              type="button"
+              onClick={toggleTimer}
+              aria-label={primaryLabel}
+              title={primaryLabel}
+            >
+              <span
+                className={isRunning ? "pause-icon" : "play-icon"}
+                aria-hidden="true"
+              />
+            </button>
+            <div className="simple-readout" aria-live="polite">
+              <strong>{formatTime(remainingSeconds)}</strong>
+            </div>
+            <button
+              className="simple-action simple-reset-action"
+              type="button"
+              onClick={resetTimer}
+              aria-label="타이머 초기화"
+              title="초기화"
+            >
+              ↻
+            </button>
+          </div>
+
+          <div className="digital-readout normal-readout" aria-live="polite">
             <span className="readout-label">
               {isComplete ? "SESSION COMPLETE" : "FOCUS TIME"}
             </span>

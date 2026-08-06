@@ -1,0 +1,23 @@
+[package]
+name = "mellow-minutes"
+version = "1.0.0"
+description = "A gentle menu bar Pomodoro timer for macOS"
+authors = ["Mellow Minutes"]
+edition = "2021"
+
+[lib]
+name = "mellow_minutes_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-window-state = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
