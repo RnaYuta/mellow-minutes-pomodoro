@@ -1,0 +1,20 @@
+{
+  "name": "Mellow Minutes Pomodoro",
+  "short_name": "Mellow Minutes",
+  "description": "다이얼을 돌려 집중 시간을 정하는 아날로그 감성의 뽀모도로 타이머",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3fbff",
+  "theme_color": "#9ed1e8",
+  "icons": [
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -16,6 +16,14 @@ const COLOR_STORAGE_KEY = "mellow-minutes-colors";
 const SIMPLE_MODE_STORAGE_KEY = "mellow-minutes-simple-mode";
 const AUTO_CYCLE_STORAGE_KEY = "mellow-minutes-auto-cycle";
 const STATS_STORAGE_KEY = "mellow-minutes-stats";
+const STATS_RESET_TIME_STORAGE_KEY = "mellow-minutes-stats-reset-time";
+const DEFAULT_STATS_RESET_TIME = "00:00";
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) =>
+  String(hour).padStart(2, "0"),
+);
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) =>
+  String(minute).padStart(2, "0"),
+);
 const TOGGLE_TIMER_EVENT = "toggle-timer";
 const TOGGLE_SHORTCUT_LABEL = "⌘⇧M";
 const COMPLETE_FLASH_MS = 3000;
@@ -118,15 +126,31 @@ function getSavedAutoCycle() {
   return savedValue === null ? true : savedValue === "true";
 }
 
-function getTodayKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+function isValidStatsResetTime(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value || "");
 }
 
-function getSavedTodayCount() {
+function getSavedStatsResetTime() {
+  const savedValue = localStorage.getItem(STATS_RESET_TIME_STORAGE_KEY);
+  return isValidStatsResetTime(savedValue)
+    ? savedValue
+    : DEFAULT_STATS_RESET_TIME;
+}
+
+function getStatsDayKey(resetTime, now = new Date()) {
+  const [hours, minutes] = resetTime.split(":").map(Number);
+  const resetBoundary = new Date(now);
+  resetBoundary.setHours(hours, minutes, 0, 0);
+  const statsDay = now < resetBoundary
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+    : now;
+  return `${statsDay.getFullYear()}-${String(statsDay.getMonth() + 1).padStart(2, "0")}-${String(statsDay.getDate()).padStart(2, "0")}`;
+}
+
+function getSavedTodayCount(resetTime) {
   try {
     const saved = JSON.parse(localStorage.getItem(STATS_STORAGE_KEY));
-    if (saved?.date === getTodayKey()) return saved.count || 0;
+    if (saved?.date === getStatsDayKey(resetTime)) return saved.count || 0;
   } catch {
     // ignore malformed storage
   }
@@ -250,13 +274,23 @@ export default function App() {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
   const [isSimpleMode, setIsSimpleMode] = useState(getSavedSimpleMode);
   const [isAutoCycleEnabled, setIsAutoCycleEnabled] = useState(getSavedAutoCycle);
+  const [isResetTimePickerOpen, setIsResetTimePickerOpen] = useState(false);
+  const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
+  const [isPwaInstalled, setIsPwaInstalled] = useState(() =>
+    window.matchMedia("(display-mode: standalone)").matches,
+  );
   const [celebrationRun, setCelebrationRun] = useState(0);
   const [isCelebrating, setIsCelebrating] = useState(false);
   const [phase, setPhaseState] = useState({
     type: SESSION_TYPES.FOCUS,
     streak: 0,
   });
-  const [todayCount, setTodayCount] = useState(getSavedTodayCount);
+  const [statsResetTime, setStatsResetTime] = useState(getSavedStatsResetTime);
+  const [resetHour, resetMinute] = statsResetTime.split(":");
+  const [todayCount, setTodayCount] = useState(() =>
+    getSavedTodayCount(getSavedStatsResetTime()),
+  );
+  const todayKeyRef = useRef(getStatsDayKey(statsResetTime));
   const endAtRef = useRef(null);
   const draggingRef = useRef(false);
   const colorMenuRef = useRef(null);
@@ -273,6 +307,28 @@ export default function App() {
     setPhaseState(next);
   }, []);
 
+  const resetDailyCountIfNeeded = useCallback(() => {
+    const currentDay = getStatsDayKey(statsResetTime);
+    if (todayKeyRef.current === currentDay) return;
+
+    todayKeyRef.current = currentDay;
+    setTodayCount(0);
+    localStorage.setItem(
+      STATS_STORAGE_KEY,
+      JSON.stringify({ date: currentDay, count: 0 }),
+    );
+  }, [statsResetTime]);
+
+  const recordFocusCompletion = useCallback(() => {
+    const currentDay = getStatsDayKey(statsResetTime);
+    if (todayKeyRef.current !== currentDay) {
+      todayKeyRef.current = currentDay;
+      setTodayCount(1);
+      return;
+    }
+    setTodayCount((count) => count + 1);
+  }, [statsResetTime]);
+
   const playCelebration = useCallback(() => {
     setCelebrationRun((run) => run + 1);
     setIsCelebrating(true);
@@ -288,6 +344,23 @@ export default function App() {
       setIsCelebrating(false);
     }, COMPLETE_FLASH_MS);
   }, []);
+
+  const stopCompletionEffect = useCallback(() => {
+    if (completeFlashTimeoutRef.current) {
+      window.clearTimeout(completeFlashTimeoutRef.current);
+      completeFlashTimeoutRef.current = null;
+    }
+    setIsComplete(false);
+    setIsCelebrating(false);
+  }, []);
+
+  const toggleCelebrationTest = useCallback(() => {
+    if (isComplete || isCelebrating) {
+      stopCompletionEffect();
+      return;
+    }
+    playCelebration();
+  }, [isComplete, isCelebrating, playCelebration, stopCompletionEffect]);
 
   const notifyPhaseComplete = useCallback(
     async (completedType, nextType) => {
@@ -371,10 +444,12 @@ export default function App() {
 
       playChime();
       notifyPhaseComplete(completedPhase.type, next.type);
-      flashComplete();
       if (completedPhase.type === SESSION_TYPES.FOCUS) {
-        setTodayCount((count) => count + 1);
+        flashComplete();
+        recordFocusCompletion();
         playCelebration();
+      } else {
+        stopCompletionEffect();
       }
     };
 
@@ -388,6 +463,8 @@ export default function App() {
     playCelebration,
     flashComplete,
     notifyPhaseComplete,
+    stopCompletionEffect,
+    recordFocusCompletion,
     setPhase,
   ]);
 
@@ -396,11 +473,31 @@ export default function App() {
   }, [colors]);
 
   useEffect(() => {
+    const currentDay = getStatsDayKey(statsResetTime);
+    todayKeyRef.current = currentDay;
+    localStorage.setItem(STATS_RESET_TIME_STORAGE_KEY, statsResetTime);
     localStorage.setItem(
       STATS_STORAGE_KEY,
-      JSON.stringify({ date: getTodayKey(), count: todayCount }),
+      JSON.stringify({ date: currentDay, count: todayCount }),
     );
-  }, [todayCount]);
+  }, [statsResetTime, todayCount]);
+
+  useEffect(() => {
+    const syncDailyCount = () => resetDailyCountIfNeeded();
+    const syncWhenVisible = () => {
+      if (document.visibilityState === "visible") syncDailyCount();
+    };
+
+    syncDailyCount();
+    const timerId = window.setInterval(syncDailyCount, 30_000);
+    window.addEventListener("focus", syncDailyCount);
+    document.addEventListener("visibilitychange", syncWhenVisible);
+    return () => {
+      window.clearInterval(timerId);
+      window.removeEventListener("focus", syncDailyCount);
+      document.removeEventListener("visibilitychange", syncWhenVisible);
+    };
+  }, [resetDailyCountIfNeeded]);
 
   useEffect(() => {
     localStorage.setItem(SIMPLE_MODE_STORAGE_KEY, String(isSimpleMode));
@@ -485,6 +582,40 @@ export default function App() {
       document.removeEventListener("keydown", closeMenu);
     };
   }, [isColorMenuOpen]);
+
+  useEffect(() => {
+    if (!isColorMenuOpen) setIsResetTimePickerOpen(false);
+  }, [isColorMenuOpen]);
+
+  useEffect(() => {
+    if (isTauriApp) return undefined;
+
+    const captureInstallPrompt = (event) => {
+      event.preventDefault();
+      setPwaInstallPrompt(event);
+    };
+    const markInstalled = () => {
+      setIsPwaInstalled(true);
+      setPwaInstallPrompt(null);
+    };
+
+    window.addEventListener("beforeinstallprompt", captureInstallPrompt);
+    window.addEventListener("appinstalled", markInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+      window.removeEventListener("appinstalled", markInstalled);
+    };
+  }, [isTauriApp]);
+
+  const installPwa = useCallback(async () => {
+    if (!pwaInstallPrompt) {
+      window.alert("Chrome 또는 Edge의 주소창에 있는 설치 아이콘을 눌러주세요.");
+      return;
+    }
+    await pwaInstallPrompt.prompt();
+    const choice = await pwaInstallPrompt.userChoice;
+    if (choice.outcome === "accepted") setPwaInstallPrompt(null);
+  }, [pwaInstallPrompt]);
 
   const updateColor = (colorName, value) => {
     setColors((currentColors) => ({
@@ -656,7 +787,7 @@ export default function App() {
 
   return (
     <main
-      className={`page-shell ${isSimpleMode ? "is-simple" : ""} ${colors.isDialColorEnabled ? "is-dial-custom" : ""}`}
+      className={`page-shell ${isTauriApp ? "is-tauri" : "is-browser"} ${isSimpleMode ? "is-simple" : ""} ${colors.isDialColorEnabled ? "is-dial-custom" : ""} ${isAutoCycleEnabled ? "is-auto-cycle" : ""}`}
       style={{
         "--user-accent": colors.gaugeColor,
         "--user-clock-color": colors.clockColor,
@@ -667,9 +798,9 @@ export default function App() {
         <button
           className="celebration-test-button"
           type="button"
-          onClick={playCelebration}
+          onClick={toggleCelebrationTest}
         >
-          종료 효과 테스트
+          {isComplete || isCelebrating ? "종료 효과 끄기" : "종료 효과 테스트"}
         </button>
       )}
       <section className="timer-workspace" aria-labelledby="page-title">
@@ -766,6 +897,63 @@ export default function App() {
                     </span>
                   </button>
 
+                  <div className="desktop-option reset-time-option">
+                    <span className="pin-symbol" aria-hidden="true">◷</span>
+                    <span>
+                      <strong>집중 횟수 초기화</strong>
+                      <small>매일 선택한 시간에 완료 횟수를 0으로 바꿔요</small>
+                    </span>
+                    <button
+                      className="reset-time-button"
+                      type="button"
+                      aria-label={`집중 횟수 초기화 시간 ${statsResetTime}`}
+                      aria-expanded={isResetTimePickerOpen}
+                      onClick={() => setIsResetTimePickerOpen((isOpen) => !isOpen)}
+                    >
+                      {statsResetTime}
+                    </button>
+                    {isResetTimePickerOpen && (
+                      <div className="reset-time-popover" role="dialog" aria-label="초기화 시간 선택">
+                        <label>
+                          <span>시</span>
+                          <select
+                            value={resetHour}
+                            aria-label="집중 횟수 초기화 시"
+                            onChange={(event) =>
+                              setStatsResetTime(`${event.target.value}:${resetMinute}`)
+                            }
+                          >
+                            {HOUR_OPTIONS.map((hour) => (
+                              <option key={hour} value={hour}>{hour}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <span className="reset-time-colon" aria-hidden="true">:</span>
+                        <label>
+                          <span>분</span>
+                          <select
+                            value={resetMinute}
+                            aria-label="집중 횟수 초기화 분"
+                            onChange={(event) =>
+                              setStatsResetTime(`${resetHour}:${event.target.value}`)
+                            }
+                          >
+                            {MINUTE_OPTIONS.map((minute) => (
+                              <option key={minute} value={minute}>{minute}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          className="reset-time-done"
+                          type="button"
+                          onClick={() => setIsResetTimePickerOpen(false)}
+                        >
+                          완료
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   {isTauriApp && (
                     <button
                       className="desktop-option"
@@ -793,6 +981,21 @@ export default function App() {
                         <small>다른 앱에서도 {TOGGLE_SHORTCUT_LABEL}로 시작/일시정지</small>
                       </span>
                     </div>
+                  )}
+
+                  {!isTauriApp && !isPwaInstalled && (
+                    <button
+                      className="desktop-option pwa-install-option"
+                      type="button"
+                      onClick={installPwa}
+                    >
+                      <span className="pin-symbol" aria-hidden="true">↓</span>
+                      <span>
+                        <strong>앱으로 설치</strong>
+                        <small>주소창 없는 독립 창에서 타이머를 실행해요</small>
+                      </span>
+                      <span className="pwa-install-badge">설치</span>
+                    </button>
                   )}
 
                   <button
@@ -1072,11 +1275,9 @@ export default function App() {
                 disabled={isDialLocked}
                 onChange={(event) => handleInputChange(event.target.value)}
                 onBlur={normalizeInput}
-                aria-describedby="minutes-help"
               />
               <span>분</span>
             </div>
-            <p id="minutes-help">1–60분 · 시계 테두리를 직접 돌려도 돼요</p>
           </div>
 
           <div className="action-row">

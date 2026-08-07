@@ -27,8 +27,12 @@ fn is_always_on_top(window: tauri::WebviewWindow) -> Result<bool, String> {
 
 #[tauri::command]
 fn set_simple_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
-    let (width, height) = if enabled { (280.0, 336.0) } else { (320.0, 510.0) };
-    let (target_width, target_height) = if enabled { (320.0, 384.0) } else { (320.0, 510.0) };
+    let (width, height) = if enabled { (320.0, 384.0) } else { (320.0, 540.0) };
+    let (target_width, target_height) = if enabled { (320.0, 384.0) } else { (320.0, 540.0) };
+
+    window
+        .set_resizable(false)
+        .map_err(|error| error.to_string())?;
 
     window
         .set_min_size(Some(tauri::LogicalSize::new(width, height)))
@@ -41,7 +45,7 @@ fn set_simple_mode(window: tauri::WebviewWindow, enabled: bool) -> Result<(), St
             let ratio = if enabled {
                 objc2_foundation::NSSize::new(5.0, 6.0)
             } else {
-                objc2_foundation::NSSize::new(32.0, 51.0)
+                objc2_foundation::NSSize::new(16.0, 27.0)
             };
             native_window.setAspectRatio(ratio);
         })
