@@ -15,6 +15,7 @@ const DEFAULT_DIAL_COLOR = "#8fa3ad";
 const COLOR_STORAGE_KEY = "mellow-minutes-colors";
 const SIMPLE_MODE_STORAGE_KEY = "mellow-minutes-simple-mode";
 const AUTO_CYCLE_STORAGE_KEY = "mellow-minutes-auto-cycle";
+const COMPLETION_EFFECT_DURATION_STORAGE_KEY = "mellow-minutes-completion-effect-duration";
 const STATS_STORAGE_KEY = "mellow-minutes-stats";
 const STATS_RESET_TIME_STORAGE_KEY = "mellow-minutes-stats-reset-time";
 const DEFAULT_STATS_RESET_TIME = "00:00";
@@ -26,7 +27,10 @@ const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, minute) =>
 );
 const TOGGLE_TIMER_EVENT = "toggle-timer";
 const TOGGLE_SHORTCUT_LABEL = "⌘⇧M";
-const COMPLETE_FLASH_MS = 3000;
+const DEFAULT_COMPLETION_EFFECT_SECONDS = 3;
+const MIN_COMPLETION_EFFECT_SECONDS = 1;
+const MAX_COMPLETION_EFFECT_SECONDS = 10;
+const COMPLETION_EFFECT_FADE_MS = 600;
 const RESET_HOLD_MS = 650;
 
 const SESSION_TYPES = {
@@ -124,6 +128,17 @@ function getSavedSimpleMode() {
 function getSavedAutoCycle() {
   const savedValue = localStorage.getItem(AUTO_CYCLE_STORAGE_KEY);
   return savedValue === null ? true : savedValue === "true";
+}
+
+function getSavedCompletionEffectDuration() {
+  const savedValue = Number(
+    localStorage.getItem(COMPLETION_EFFECT_DURATION_STORAGE_KEY),
+  );
+  if (!Number.isFinite(savedValue)) return DEFAULT_COMPLETION_EFFECT_SECONDS;
+  return Math.min(
+    MAX_COMPLETION_EFFECT_SECONDS,
+    Math.max(MIN_COMPLETION_EFFECT_SECONDS, Math.round(savedValue)),
+  );
 }
 
 function isValidStatsResetTime(value) {
@@ -274,6 +289,9 @@ export default function App() {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(true);
   const [isSimpleMode, setIsSimpleMode] = useState(getSavedSimpleMode);
   const [isAutoCycleEnabled, setIsAutoCycleEnabled] = useState(getSavedAutoCycle);
+  const [completionEffectSeconds, setCompletionEffectSeconds] = useState(
+    getSavedCompletionEffectDuration,
+  );
   const [isResetTimePickerOpen, setIsResetTimePickerOpen] = useState(false);
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState(null);
   const [isPwaInstalled, setIsPwaInstalled] = useState(() =>
@@ -281,6 +299,7 @@ export default function App() {
   );
   const [celebrationRun, setCelebrationRun] = useState(0);
   const [isCelebrating, setIsCelebrating] = useState(false);
+  const [isCompletionEffectEnding, setIsCompletionEffectEnding] = useState(false);
   const [phase, setPhaseState] = useState({
     type: SESSION_TYPES.FOCUS,
     streak: 0,
@@ -299,6 +318,7 @@ export default function App() {
   const dialColorInputRef = useRef(null);
   const phaseRef = useRef(phase);
   const completeFlashTimeoutRef = useRef(null);
+  const completeFadeTimeoutRef = useRef(null);
   const toggleTimerRef = useRef(() => {});
 
   const setPhase = useCallback((updater) => {
@@ -330,28 +350,45 @@ export default function App() {
   }, [statsResetTime]);
 
   const playCelebration = useCallback(() => {
+    setIsCompletionEffectEnding(false);
     setCelebrationRun((run) => run + 1);
     setIsCelebrating(true);
   }, []);
 
   const flashComplete = useCallback(() => {
+    const effectDurationMs = completionEffectSeconds * 1000;
+    setIsCompletionEffectEnding(false);
     setIsComplete(true);
     if (completeFlashTimeoutRef.current) {
       window.clearTimeout(completeFlashTimeoutRef.current);
     }
+    if (completeFadeTimeoutRef.current) {
+      window.clearTimeout(completeFadeTimeoutRef.current);
+    }
+    completeFadeTimeoutRef.current = window.setTimeout(() => {
+      setIsCompletionEffectEnding(true);
+      completeFadeTimeoutRef.current = null;
+    }, Math.max(0, effectDurationMs - COMPLETION_EFFECT_FADE_MS));
     completeFlashTimeoutRef.current = window.setTimeout(() => {
       setIsComplete(false);
       setIsCelebrating(false);
-    }, COMPLETE_FLASH_MS);
-  }, []);
+      setIsCompletionEffectEnding(false);
+      completeFlashTimeoutRef.current = null;
+    }, effectDurationMs);
+  }, [completionEffectSeconds]);
 
   const stopCompletionEffect = useCallback(() => {
     if (completeFlashTimeoutRef.current) {
       window.clearTimeout(completeFlashTimeoutRef.current);
       completeFlashTimeoutRef.current = null;
     }
+    if (completeFadeTimeoutRef.current) {
+      window.clearTimeout(completeFadeTimeoutRef.current);
+      completeFadeTimeoutRef.current = null;
+    }
     setIsComplete(false);
     setIsCelebrating(false);
+    setIsCompletionEffectEnding(false);
   }, []);
 
   const toggleCelebrationTest = useCallback(() => {
@@ -359,8 +396,9 @@ export default function App() {
       stopCompletionEffect();
       return;
     }
+    flashComplete();
     playCelebration();
-  }, [isComplete, isCelebrating, playCelebration, stopCompletionEffect]);
+  }, [flashComplete, isComplete, isCelebrating, playCelebration, stopCompletionEffect]);
 
   const notifyPhaseComplete = useCallback(
     async (completedType, nextType) => {
@@ -513,6 +551,25 @@ export default function App() {
   }, [isAutoCycleEnabled]);
 
   useEffect(() => {
+    localStorage.setItem(
+      COMPLETION_EFFECT_DURATION_STORAGE_KEY,
+      String(completionEffectSeconds),
+    );
+  }, [completionEffectSeconds]);
+
+  useEffect(
+    () => () => {
+      if (completeFlashTimeoutRef.current) {
+        window.clearTimeout(completeFlashTimeoutRef.current);
+      }
+      if (completeFadeTimeoutRef.current) {
+        window.clearTimeout(completeFadeTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
     if (!isTauriApp) return undefined;
 
     const syncAlwaysOnTop = async () => {
@@ -528,7 +585,7 @@ export default function App() {
     return () => window.removeEventListener("focus", syncAlwaysOnTop);
   }, [isTauriApp]);
 
-  // Mirror the countdown onto the menu bar tray icon.
+  // Mirror the countdown onto the macOS menu bar or Windows system tray.
   useEffect(() => {
     if (!isTauriApp) return;
     const phaseSeconds = getPhaseMinutes(phase.type, configuredMinutes) * 60;
@@ -536,8 +593,12 @@ export default function App() {
     const title = isIdle
       ? ""
       : `${SESSION_ICONS[phase.type]} ${formatTime(remainingSeconds)}`;
-    invoke("set_tray_title", { title }).catch((error) => {
-      console.error("메뉴바 타이틀을 갱신하지 못했습니다.", error);
+    invoke("set_tray_title", {
+      title,
+      remainingSeconds,
+      isIdle,
+    }).catch((error) => {
+      console.error("트레이 타이머를 갱신하지 못했습니다.", error);
     });
   }, [isTauriApp, isRunning, remainingSeconds, phase.type, configuredMinutes]);
 
@@ -846,14 +907,17 @@ export default function App() {
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         setColors({
                           gaugeColor: DEFAULT_GAUGE_COLOR,
                           clockColor: DEFAULT_CLOCK_COLOR,
                           dialColor: DEFAULT_DIAL_COLOR,
                           isDialColorEnabled: false,
-                        })
-                      }
+                        });
+                        setCompletionEffectSeconds(
+                          DEFAULT_COMPLETION_EFFECT_SECONDS,
+                        );
+                      }}
                     >
                       초기화
                     </button>
@@ -896,6 +960,38 @@ export default function App() {
                       <span />
                     </span>
                   </button>
+
+                  <div className="desktop-option effect-duration-option">
+                    <span className="pin-symbol" aria-hidden="true">✦</span>
+                    <label htmlFor="completion-effect-duration">
+                      <strong>집중 종료 이펙트 시간</strong>
+                      <small>드래그해서 이펙트가 보이는 시간을 조절해요</small>
+                    </label>
+                    <div className="effect-duration-control">
+                      <output htmlFor="completion-effect-duration">
+                        {completionEffectSeconds}초
+                      </output>
+                      <input
+                        id="completion-effect-duration"
+                        type="range"
+                        min={MIN_COMPLETION_EFFECT_SECONDS}
+                        max={MAX_COMPLETION_EFFECT_SECONDS}
+                        step="1"
+                        value={completionEffectSeconds}
+                        aria-label="집중 종료 이펙트 시간"
+                        aria-valuetext={`${completionEffectSeconds}초`}
+                        style={{
+                          "--range-progress": `${
+                            ((completionEffectSeconds - MIN_COMPLETION_EFFECT_SECONDS) /
+                              (MAX_COMPLETION_EFFECT_SECONDS - MIN_COMPLETION_EFFECT_SECONDS)) * 100
+                          }%`,
+                        }}
+                        onChange={(event) =>
+                          setCompletionEffectSeconds(Number(event.target.value))
+                        }
+                      />
+                    </div>
+                  </div>
 
                   <div className="desktop-option reset-time-option">
                     <span className="pin-symbol" aria-hidden="true">◷</span>
@@ -1100,7 +1196,7 @@ export default function App() {
         </div>
 
         <div
-          className={`timer-device ${isComplete ? "is-complete" : ""} ${isCelebrating ? "is-celebrating" : ""}`}
+          className={`timer-device ${isComplete ? "is-complete" : ""} ${isCelebrating ? "is-celebrating" : ""} ${isCompletionEffectEnding ? "is-effect-ending" : ""}`}
         >
           <div className="simple-drag-region" data-tauri-drag-region />
           <div className="light-aura" aria-hidden="true" />
