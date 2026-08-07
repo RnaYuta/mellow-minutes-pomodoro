@@ -112,7 +112,7 @@ pub fn run() {
                 None::<&str>,
             )?;
             let separator = PredefinedMenuItem::separator(app)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Mellow Minutes 종료", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Mellow Pomodoro Timer 종료", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &pin_item, &separator, &quit_item])?;
             let pin_item_for_menu = pin_item.clone();
             let tray_icon = tauri::image::Image::from_bytes(include_bytes!(
@@ -120,7 +120,7 @@ pub fn run() {
             ))?;
 
             TrayIconBuilder::with_id("mellow-minutes-tray")
-                .tooltip("Mellow Minutes")
+                .tooltip("Mellow Pomodoro Timer")
                 .icon(tray_icon)
                 .icon_as_template(true)
                 .menu(&menu)
@@ -158,5 +158,5 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running Mellow Minutes");
+        .expect("error while running Mellow Pomodoro Timer");
 }

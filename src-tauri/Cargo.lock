@@ -1976,8 +1976,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "mellow-minutes"
-version = "1.1.1"
+name = "mellow-pomodoro-timer"
+version = "1.1.2"
 dependencies = [
  "objc2-app-kit",
  "objc2-foundation",

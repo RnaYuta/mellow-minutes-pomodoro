@@ -806,7 +806,7 @@ export default function App() {
       <section className="timer-workspace" aria-labelledby="page-title">
         <header className="brand-row" data-tauri-drag-region>
           <div className="brand-copy" data-tauri-drag-region>
-            <p className="eyebrow" data-tauri-drag-region>MELLOW MINUTES</p>
+            <p className="eyebrow" data-tauri-drag-region>MELLOW POMODORO TIMER</p>
             <h1 id="page-title" data-tauri-drag-region>나만의 집중 타이머</h1>
             <p className="phase-status" data-tauri-drag-region>
               <span className="phase-tag">{phaseIcon} {phaseLabel}</span>

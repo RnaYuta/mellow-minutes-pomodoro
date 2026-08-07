@@ -1,4 +1,4 @@
-const CACHE_NAME = "mellow-minutes-v1";
+const CACHE_NAME = "mellow-pomodoro-timer-v2";
 const APP_ROOT = new URL("./", self.registration.scope).href;
 
 self.addEventListener("install", (event) => {

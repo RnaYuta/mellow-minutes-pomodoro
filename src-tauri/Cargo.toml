@@ -1,12 +1,12 @@
 [package]
-name = "mellow-minutes"
-version = "1.1.1"
+name = "mellow-pomodoro-timer"
+version = "1.1.2"
 description = "A gentle menu bar Pomodoro timer for macOS"
-authors = ["Mellow Minutes"]
+authors = ["Mellow Pomodoro Timer"]
 edition = "2021"
 
 [lib]
-name = "mellow_minutes_lib"
+name = "mellow_pomodoro_timer_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

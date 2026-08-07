@@ -1,3 +1,3 @@
 fn main() {
-    mellow_minutes_lib::run();
+    mellow_pomodoro_timer_lib::run();
 }
