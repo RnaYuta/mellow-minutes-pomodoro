@@ -64,6 +64,24 @@ input {
   display: grid;
   place-items: center;
   padding: clamp(22px, min(5vw, 5vh), 64px) clamp(16px, 4vw, 40px);
+  background:
+    radial-gradient(
+      circle at 15% 16%,
+      color-mix(in srgb, var(--clock-color), white 84%) 0 9%,
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 84% 78%,
+      color-mix(in srgb, var(--clock-color), transparent 68%) 0 8%,
+      transparent 30%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--clock-color), white 94%),
+      color-mix(in srgb, var(--clock-color), white 87%) 48%,
+      color-mix(in srgb, var(--clock-color), white 80%)
+    );
+  transition: background 180ms ease;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1507,6 +1525,23 @@ h1 {
     --simple-readout-fg: #f2f2f7;
     --simple-reset-bg: #3a3a3c;
     --simple-reset-fg: #f2f2f7;
+    background:
+      radial-gradient(
+        circle at 15% 16%,
+        color-mix(in srgb, var(--clock-color), Canvas 74%) 0 8%,
+        transparent 27%
+      ),
+      radial-gradient(
+        circle at 84% 78%,
+        color-mix(in srgb, var(--clock-color), transparent 82%) 0 8%,
+        transparent 30%
+      ),
+      linear-gradient(
+        145deg,
+        color-mix(in srgb, Canvas 92%, var(--clock-color) 8%),
+        color-mix(in srgb, Canvas 86%, var(--clock-color) 14%) 52%,
+        color-mix(in srgb, Canvas 80%, var(--clock-color) 20%)
+      );
   }
 
   body {
